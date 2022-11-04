@@ -8,13 +8,15 @@ import { SceneLoader } from "@babylonjs/core/Loading/sceneLoader";
 import { AdvancedDynamicTexture } from "@babylonjs/gui/2D/advancedDynamicTexture";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { StackPanel } from "@babylonjs/gui/2D/controls/stackPanel";
-import { Control } from "@babylonjs/gui/2D/controls/control";
 import { TextBlock } from "@babylonjs/gui/2D/controls/textBlock";
-import { Checkbox } from "@babylonjs/gui/2D/controls/checkbox";
 import { Button } from "@babylonjs/gui/2D/controls/button";
 import { Container } from "@babylonjs/gui/2D/controls/container";
 import { Animation } from "@babylonjs/core/Animations/animation";
 import { QuadraticEase } from "@babylonjs/core/Animations/easing";
+import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
+import { AnimationGroup } from "@babylonjs/core/Animations/animationGroup";
+import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
+import {HTMLTwinRenderer} from "@babylonjs/accessibility";
 
 // required imports
 import "@babylonjs/core/Loading/loadingScreen";
@@ -27,27 +29,29 @@ import "@babylonjs/core/Helpers/sceneHelpers";
 // digital assets
 import personModel from "../../assets/glb/amy-wave-idle.glb";
 import sharkModel from "../../assets/glb/shark.glb";
-import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
-import { AnimationGroup } from "@babylonjs/core/Animations/animationGroup";
-import { Material } from "@babylonjs/core/Materials/material";
-import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 
 export class LoadModelAndEnvScene implements CreateSceneClass {
     private useAnimations = true;
     createScene = async (
-        engine: Engine,
-        canvas: HTMLCanvasElement
+        engine: Engine
     ): Promise<Scene> => {
         // This creates a basic Babylon Scene object (non-mesh)
         const scene = new Scene(engine);
 
         const {idleAnim, waveAnim, shark, amy, uiMesh, uiRatio} = await this.buildSceneObjects(scene);
 
+        amy.accessibilityTag = {
+            description: "A young girl named Amy. She is happy you are doing her quiz!"
+        }
+
+        shark.accessibilityTag = {
+            description: "A powerful shark. It is swimming."
+        }
+
         // Build GUI
         const primaryColor = "#1b1869";
         const secondaryColor = "skyblue";
 
-        // const advancedTexture = AdvancedDynamicTexture.CreateFullscreenUI("UI");
         const baseUiWidth = 1024;
         const advancedTexture = AdvancedDynamicTexture.CreateForMesh(uiMesh, baseUiWidth, baseUiWidth * uiRatio);
 
@@ -70,6 +74,7 @@ export class LoadModelAndEnvScene implements CreateSceneClass {
         titleBtns[0].onPointerClickObservable.add(() => {
             this.swapContainers(scene, titlePanel, questionPanel);
             this.swapAnimations(waveAnim, idleAnim);
+            this.swapAccessibilityDescriptions(amy, "A young girl named Amy. She is waiting for your answer.");
         });
 
         // Transition from question to answer
@@ -85,10 +90,19 @@ export class LoadModelAndEnvScene implements CreateSceneClass {
             this.swapContainers(scene, answerPanel, titlePanel);
             this.swapModels(scene, shark, amy);
             this.swapAnimations(idleAnim, waveAnim);
+            this.swapAccessibilityDescriptions(amy, "A young girl named Amy. She is happy you are doing her quiz!");
         });
+
+        HTMLTwinRenderer.Render(scene);
 
         return scene;
     };
+
+    swapAccessibilityDescriptions(node: TransformNode, to: string) {
+        if (node.accessibilityTag) {
+            node.accessibilityTag.description = to;
+        }
+    }
 
     swapModels(scene: Scene, from: TransformNode, to: TransformNode) {
         if (this.useAnimations) {
@@ -149,8 +163,6 @@ export class LoadModelAndEnvScene implements CreateSceneClass {
         this.addText(
             "Welcome to Amy's Quiz!",
             96,
-            "450px",
-            "112px",
             primaryColor,
             titlePanel
         );
@@ -158,33 +170,18 @@ export class LoadModelAndEnvScene implements CreateSceneClass {
         this.addText(
             "Click on the button below to start the quiz!",
             56,
-            "450px",
-            "24px",
             primaryColor,
             titlePanel
         );
 
-        const animationsCheckPanel = this.addPanel(false, "100%", "80px", 0, secondaryColor, titlePanel);
-
-        this.addText(
-            "Enable Animations",
-            40,
-            "200px",
-            "24px",
-            primaryColor,
-            animationsCheckPanel
-        );
-
-        const animationsCheck = new Checkbox("checkbox");
-        animationsCheck.isChecked = this.useAnimations;
-        animationsCheck.width = "48px";
-        animationsCheck.height = "48px";
-        animationsCheck.color = primaryColor;
-        animationsCheck.background = secondaryColor;
-        animationsCheck.onIsCheckedChangedObservable.add((value) => {
-            this.useAnimations = value;
+        const animationsButton = this.addButton("Turn " + (this.useAnimations ? "Off" : "On") + " Animations", "80%", "48px", primaryColor, secondaryColor, titlePanel);
+        animationsButton.onPointerClickObservable.add(() => {
+            this.useAnimations = !this.useAnimations;
+            animationsButton.textBlock!.text = "Turn " + (this.useAnimations ? "Off" : "On") + " Animations";
+            animationsButton.accessibilityTag= { 
+                description: animationsButton.textBlock!.text
+            }
         });
-        animationsCheckPanel.addControl(animationsCheck);
 
         const startButton = this.addButton("Start Quiz", "80%", "56px", primaryColor, secondaryColor, titlePanel);
 
@@ -201,8 +198,6 @@ export class LoadModelAndEnvScene implements CreateSceneClass {
         this.addText(
             "In what geologic time period appeared the first sharks?",
             56,
-            "450px",
-            "64px",
             primaryColor,
             questionPanel
         );
@@ -245,24 +240,18 @@ export class LoadModelAndEnvScene implements CreateSceneClass {
         this.addText(
             "The correct answer is:",
             64,
-            "450px",
-            "64px",
             primaryColor,
             answerPanel
         );
         this.addText(
             "Silurian",
             60,
-            "450px",
-            "64px",
             primaryColor,
             answerPanel
         );
         this.addText(
             "The oldest generally accepted 'shark' scales are from about 420 million years ago, in the Silurian period. Those animals looked very different from modern sharks. At this time the most common shark tooth is the cladodont, a style of thin tooth with three tines like a trident, apparently to help catch fish. (font: Wikipedia)",
             56,
-            "450px",
-            "108px",
             primaryColor,
             answerPanel
         );
@@ -293,8 +282,6 @@ export class LoadModelAndEnvScene implements CreateSceneClass {
     addText(
         text: string,
         fontSize: number,
-        textWidth: string | number,
-        textHeight: string | number,
         textColor: string,
         parent: Container
     ) {
@@ -302,8 +289,6 @@ export class LoadModelAndEnvScene implements CreateSceneClass {
         textBlock.text = text;
         textBlock.fontSize = fontSize;
         textBlock.textWrapping = true;
-        // textBlock.width = textWidth;
-        // textBlock.height = textHeight;
         textBlock.resizeToFit = true;
         textBlock.color = textColor;
         parent.addControl(textBlock);
@@ -353,18 +338,6 @@ export class LoadModelAndEnvScene implements CreateSceneClass {
             new Vector3(-1, 1, 0)
         );
         const light = new HemisphericLight("l", new Vector3(0, 1, 0), scene);
-
-        // void Promise.all([
-        //     import("@babylonjs/core/Debug/debugLayer"),
-        //     import("@babylonjs/inspector"),
-        // ]).then((_values) => {
-        //     console.log(_values);
-        //     scene.debugLayer.show({
-        //         handleResize: true,
-        //         overlay: true,
-        //         globalRoot: document.getElementById("#root") || undefined,
-        //     });
-        // });
 
         camera.attachControl();
 
@@ -418,7 +391,7 @@ export class LoadModelAndEnvScene implements CreateSceneClass {
 
         scene.createDefaultXRExperienceAsync();
 
-        return { camera, light, amy: amyTransformParent , idleAnim, waveAnim, shark: transformParent, uiMesh: plaqueMesh, uiRatio: ratio };
+        return { camera, light, amy: amyTransformParent, idleAnim, waveAnim, shark: transformParent, uiMesh: plaqueMesh, uiRatio: ratio };
     }
 }
 
